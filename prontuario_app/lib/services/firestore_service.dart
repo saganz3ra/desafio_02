@@ -6,7 +6,6 @@ class FirestoreService {
     'prontuarios',
   );
 
-  // 🟢 Adicionar novo prontuário
   Future<void> adicionarProntuario(Prontuario prontuario) async {
     try {
       await _collection.add(prontuario.toMap());
@@ -15,7 +14,6 @@ class FirestoreService {
     }
   }
 
-  // 🔴 Deletar prontuário por ID
   Future<void> deletarProntuario(String id) async {
     try {
       await _collection.doc(id).delete();
@@ -24,7 +22,18 @@ class FirestoreService {
     }
   }
 
-  // 🟣 Listar prontuários em tempo real (Stream)
+  Future<void> atualizarProntuario(Prontuario prontuario) async {
+    if (prontuario.id == null) {
+      throw Exception('Prontuário sem id para atualizar');
+    }
+
+    try {
+      await _collection.doc(prontuario.id).update(prontuario.toMap());
+    } catch (e) {
+      throw Exception('Erro ao atualizar prontuário: $e');
+    }
+  }
+
   Stream<List<Prontuario>> listarProntuarios() {
     return _collection
         .orderBy('data', descending: true)
@@ -37,5 +46,71 @@ class FirestoreService {
             );
           }).toList(),
         );
+  }
+
+  Stream<List<Prontuario>> listarProntuariosComFiltro({
+    String? pacienteContains,
+    DateTime? dataInicio,
+    DateTime? dataFim,
+  }) {
+    Query query = _collection;
+
+    if (dataInicio != null) {
+      query = query.where(
+        'data',
+        isGreaterThanOrEqualTo: Timestamp.fromDate(dataInicio),
+      );
+    }
+
+    if (dataFim != null) {
+      query = query.where(
+        'data',
+        isLessThanOrEqualTo: Timestamp.fromDate(dataFim),
+      );
+    }
+
+    query = query.orderBy('data', descending: true);
+
+    return query.snapshots().map((snapshot) {
+      var list = snapshot.docs
+          .map(
+            (doc) =>
+                Prontuario.fromMap(doc.data() as Map<String, dynamic>, doc.id),
+          )
+          .toList();
+
+      if (pacienteContains != null && pacienteContains.trim().isNotEmpty) {
+        final q = pacienteContains.toLowerCase();
+        list = list.where((p) => p.paciente.toLowerCase().contains(q)).toList();
+      }
+
+      return list;
+    });
+  }
+
+  Future<List<Prontuario>> buscarProntuariosPaginados({
+    int pageSize = 10,
+    DocumentSnapshot? startAfterDoc,
+  }) async {
+    try {
+      Query query = _collection
+          .orderBy('data', descending: true)
+          .limit(pageSize);
+
+      if (startAfterDoc != null) {
+        query = query.startAfterDocument(startAfterDoc);
+      }
+
+      final snapshot = await query.get();
+
+      return snapshot.docs
+          .map(
+            (doc) =>
+                Prontuario.fromMap(doc.data() as Map<String, dynamic>, doc.id),
+          )
+          .toList();
+    } catch (e) {
+      throw Exception('Erro ao buscar prontuários paginados: $e');
+    }
   }
 }

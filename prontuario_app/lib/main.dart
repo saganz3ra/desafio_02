@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:prontuario_app/ui/prontuario_list_screen.dart';
 import 'firebase_options.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  try {
+    await FirebaseAuth.instance.signInAnonymously();
+  } catch (e) {
+    print('Erro ao autenticar anonimamente: $e');
+  }
 
   runApp(const ProntuarioApp());
 }

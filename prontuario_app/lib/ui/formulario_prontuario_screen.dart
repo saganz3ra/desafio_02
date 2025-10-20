@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:prontuario_app/models/prontuario.dart';
 import 'package:prontuario_app/services/firestore_service.dart';
-import 'prontuario_list_screen.dart';
 
 class FormularioProntuarioScreen extends StatefulWidget {
-  const FormularioProntuarioScreen({super.key});
+  final Prontuario? prontuario;
+
+  const FormularioProntuarioScreen({super.key, this.prontuario});
 
   @override
   State<FormularioProntuarioScreen> createState() =>
@@ -18,6 +19,8 @@ class _FormularioProntuarioScreenState
   final _descricaoController = TextEditingController();
   final _service = FirestoreService();
 
+  bool get isEdit => widget.prontuario != null;
+
   @override
   void dispose() {
     _pacienteController.dispose();
@@ -25,25 +28,35 @@ class _FormularioProntuarioScreenState
     super.dispose();
   }
 
+  @override
+  void initState() {
+    super.initState();
+
+    if (isEdit) {
+      _pacienteController.text = widget.prontuario!.paciente;
+      _descricaoController.text = widget.prontuario!.descricao;
+    }
+  }
+
   Future<void> _salvarProntuario() async {
     if (_formKey.currentState!.validate()) {
       final prontuario = Prontuario(
+        id: widget.prontuario?.id,
         paciente: _pacienteController.text.trim(),
         descricao: _descricaoController.text.trim(),
-        data: DateTime.now(),
+        data: widget.prontuario?.data ?? DateTime.now(),
       );
 
       try {
-        await _service.adicionarProntuario(prontuario);
+        if (isEdit) {
+          await _service.atualizarProntuario(prontuario);
+        } else {
+          await _service.adicionarProntuario(prontuario);
+        }
 
         if (!mounted) return;
 
-        // Redireciona para a tela principal (ProntuarioListScreen) e limpa a pilha
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (_) => const ProntuarioListScreen()),
-          (route) => false,
-        );
+        Navigator.pop(context, true);
       } catch (e) {
         if (!mounted) return;
         ScaffoldMessenger.of(
