@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:prontuario_app/models/prontuario.dart';
 import 'package:prontuario_app/services/firestore_service.dart';
@@ -18,6 +20,7 @@ class _FormularioProntuarioScreenState
   final _pacienteController = TextEditingController();
   final _descricaoController = TextEditingController();
   final _service = FirestoreService();
+  bool _isSaving = false;
 
   bool get isEdit => widget.prontuario != null;
 
@@ -39,30 +42,48 @@ class _FormularioProntuarioScreenState
   }
 
   Future<void> _salvarProntuario() async {
-    if (_formKey.currentState!.validate()) {
-      final prontuario = Prontuario(
-        id: widget.prontuario?.id,
-        paciente: _pacienteController.text.trim(),
-        descricao: _descricaoController.text.trim(),
-        data: widget.prontuario?.data ?? DateTime.now(),
-      );
+    if (!_formKey.currentState!.validate()) return;
 
-      try {
-        if (isEdit) {
-          await _service.atualizarProntuario(prontuario);
-        } else {
-          await _service.adicionarProntuario(prontuario);
-        }
+    final prontuario = Prontuario(
+      id: widget.prontuario?.id,
+      paciente: _pacienteController.text.trim(),
+      descricao: _descricaoController.text.trim(),
+      data: widget.prontuario?.data ?? DateTime.now(),
+    );
 
-        if (!mounted) return;
+    setState(() => _isSaving = true);
 
-        Navigator.pop(context, true);
-      } catch (e) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Erro ao salvar: $e')));
+    try {
+      if (isEdit) {
+        await _service
+            .atualizarProntuario(prontuario)
+            .timeout(const Duration(seconds: 12));
+      } else {
+        await _service
+            .adicionarProntuario(prontuario)
+            .timeout(const Duration(seconds: 12));
       }
+
+      if (!mounted) return;
+
+      Navigator.pop(context, true);
+    } catch (e) {
+      if (e is TimeoutException) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Tempo excedido ao salvar. Tente novamente.'),
+            ),
+          );
+        }
+      }
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erro ao salvar: ${e.toString()}')),
+      );
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
     }
   }
 
@@ -101,8 +122,10 @@ class _FormularioProntuarioScreenState
                 width: double.infinity,
                 child: ElevatedButton.icon(
                   icon: const Icon(Icons.save),
-                  label: const Text('Salvar'),
-                  onPressed: _salvarProntuario,
+                  label: _isSaving
+                      ? const Text('Salvando...')
+                      : const Text('Salvar'),
+                  onPressed: _isSaving ? null : _salvarProntuario,
                 ),
               ),
             ],

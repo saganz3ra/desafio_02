@@ -9,6 +9,8 @@ class FirestoreService {
   Future<void> adicionarProntuario(Prontuario prontuario) async {
     try {
       await _collection.add(prontuario.toMap());
+    } on FirebaseException {
+      rethrow;
     } catch (e) {
       throw Exception('Erro ao adicionar prontuário: $e');
     }

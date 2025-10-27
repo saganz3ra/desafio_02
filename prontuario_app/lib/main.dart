@@ -9,9 +9,7 @@ Future<void> main() async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   try {
     await FirebaseAuth.instance.signInAnonymously();
-  } catch (e) {
-    print('Erro ao autenticar anonimamente: $e');
-  }
+  } catch (e) {}
 
   runApp(const ProntuarioApp());
 }
